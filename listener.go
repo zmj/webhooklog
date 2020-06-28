@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 func (srv *server) logHandler(resp http.ResponseWriter, req *http.Request) {
@@ -35,27 +36,22 @@ type listener struct {
 }
 
 func (ls *listener) listen() {
-	for msg := range ls.msgs {
-		_, err := ls.resp.Write(msg)
-		err = ls.padNewlines(msg, 2)
-		if err != nil {
-			return
+	var err error
+	for err == nil {
+		select {
+		case msg := <-ls.msgs:
+			_, err = ls.resp.Write([]byte{newline})
+			_, err = ls.resp.Write(msg)
+			_, err = ls.resp.Write([]byte{newline})
+		case <-time.After(10 * time.Second):
+			_, err = ls.resp.Write([]byte{period})
 		}
 		ls.resp.(http.Flusher).Flush()
 	}
 }
 
 const newline = byte('\n')
-
-func (ls *listener) padNewlines(msg []byte, n int) error {
-	var err error
-	for i := 1; i <= n; i++ {
-		if len(msg) >= i && msg[len(msg)-i] != newline {
-			_, err = ls.resp.Write([]byte{newline})
-		}
-	}
-	return err
-}
+const period = byte('.')
 
 func (ls *listener) log(msg []byte) {
 	select {
