@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 )
 
 func (srv *server) logHandler(resp http.ResponseWriter, req *http.Request) {
@@ -17,10 +17,44 @@ func (srv *server) logHandler(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Add("Content-Type", "text/plain")
 	resp.Header().Add("Transfer-Encoding", "chunked")
 	resp.Header().Add("X-Content-Type-Options", "nosniff")
-	for err == nil {
-		_, err = resp.Write([]byte(logID))
-		resp.(http.Flusher).Flush()
-		<-time.After(time.Second)
+	resp.WriteHeader(http.StatusOK)
+	resp.(http.Flusher).Flush()
+
+	ls := newListener(logID, resp)
+	srv.router.add(ls)
+	defer srv.router.remove(ls)
+	ls.listen()
+}
+
+type listener struct {
+	logID string
+	resp  http.ResponseWriter
+	msgs  chan []byte
+}
+
+func (ls *listener) listen() {
+	for msg := range ls.msgs {
+		_, err := ls.resp.Write(msg)
+		if err != nil {
+			return
+		}
+		ls.resp.(http.Flusher).Flush()
+	}
+}
+
+func (ls *listener) log(msg []byte) {
+	select {
+	case ls.msgs <- msg:
+	default:
+		log.Println("queue full, dropped message")
+	}
+}
+
+func newListener(logID string, resp http.ResponseWriter) *listener {
+	return &listener{
+		logID: logID,
+		resp:  resp,
+		msgs:  make(chan []byte, 16),
 	}
 }
 

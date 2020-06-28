@@ -11,9 +11,7 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
-	srv := &server{
-		router: newRouter(),
-	}
+	srv := newServer()
 	err = srv.serve(port)
 	if err != nil {
 		log.Println(err)
