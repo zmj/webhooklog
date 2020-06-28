@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 func (srv *server) logHandler(resp http.ResponseWriter, req *http.Request) {
@@ -13,7 +14,14 @@ func (srv *server) logHandler(resp http.ResponseWriter, req *http.Request) {
 		http.Error(resp, err.Error(), http.StatusBadRequest)
 		return
 	}
-	resp.Write([]byte(logID))
+	resp.Header().Add("Content-Type", "text/plain")
+	resp.Header().Add("Transfer-Encoding", "chunked")
+	resp.Header().Add("X-Content-Type-Options", "nosniff")
+	for err == nil {
+		_, err = resp.Write([]byte(logID))
+		resp.(http.Flusher).Flush()
+		<-time.After(time.Second)
+	}
 }
 
 func logIDFromPath(url *url.URL) (string, error) {
