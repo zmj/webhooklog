@@ -11,8 +11,9 @@ type server struct {
 }
 
 func (srv *server) serve(port int) error {
-	http.HandleFunc("/", srv.defaultHandler)
 	http.HandleFunc("/log/", srv.logHandler)
+	http.HandleFunc("/", srv.defaultHandler)
+	http.HandleFunc("/ms/", srv.msGraphHandler)
 	addr := fmt.Sprintf(":%v", port)
 	return http.ListenAndServe(addr, nil)
 }
@@ -24,6 +25,7 @@ func (srv *server) defaultHandler(resp http.ResponseWriter, req *http.Request) {
 		return
 	}
 	srv.router.log(logID, req)
+
 	var status int
 	switch req.Method {
 	case http.MethodGet:

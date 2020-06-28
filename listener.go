@@ -17,7 +17,9 @@ func (srv *server) logHandler(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Add("Content-Type", "text/plain")
 	resp.Header().Add("Transfer-Encoding", "chunked")
 	resp.Header().Add("X-Content-Type-Options", "nosniff")
-	resp.WriteHeader(http.StatusOK)
+	resp.Header().Add("Cache-Control", "no-store")
+	resp.Header().Add("Cache-Control", "no-transform")
+	resp.Write([]byte{newline})
 	resp.(http.Flusher).Flush()
 
 	ls := newListener(logID, resp)
@@ -35,11 +37,24 @@ type listener struct {
 func (ls *listener) listen() {
 	for msg := range ls.msgs {
 		_, err := ls.resp.Write(msg)
+		err = ls.padNewlines(msg, 2)
 		if err != nil {
 			return
 		}
 		ls.resp.(http.Flusher).Flush()
 	}
+}
+
+const newline = byte('\n')
+
+func (ls *listener) padNewlines(msg []byte, n int) error {
+	var err error
+	for i := 1; i <= n; i++ {
+		if len(msg) >= i && msg[len(msg)-i] != newline {
+			_, err = ls.resp.Write([]byte{newline})
+		}
+	}
+	return err
 }
 
 func (ls *listener) log(msg []byte) {
